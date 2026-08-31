@@ -1,0 +1,25 @@
+# Python virtual environment - regenerate with: pip install -r requirements.txt
+venv/
+env/
+.venv/
+
+# Python bytecode/cache
+__pycache__/
+*.pyc
+*.pyo
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Auto-downloaded at runtime / build time - not source, don't need to be in git
+clinvar_variant_summary.txt.gz
+HUMAN_9606_idmapping.dat
+HUMAN_9606_idmapping.dat.gz
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Env secrets, if you ever add a local .env file
+.env

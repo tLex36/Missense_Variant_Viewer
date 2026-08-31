@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roche Lab Variant Viewer</title>
+<script>
+    // Set the theme before first paint so there's no flash of the wrong theme.
+    (function () {
+        var saved = localStorage.getItem('theme');
+        document.documentElement.setAttribute('data-theme', saved === 'light' ? 'light' : 'dark');
+    })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+</head>
+<body>
+
+<div class="page">
+
+    <header class="site-header">
+        <div class="header-row">
+            <div class="header-brand">
+                <span class="header-icon">🧬</span>
+                <h1>Roche Lab Variant Viewer</h1>
+            </div>
+            <div class="header-meta">
+                <span class="badge">Under construction</span>
+                <span class="header-version">v1.0.5-alpha.1 &middot; June 2026</span>
+                <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Switch to light theme">
+                    <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="4"></circle>
+                        <line x1="12" y1="2" x2="12" y2="4"></line>
+                        <line x1="12" y1="20" x2="12" y2="22"></line>
+                        <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"></line>
+                        <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"></line>
+                        <line x1="2" y1="12" x2="4" y2="12"></line>
+                        <line x1="20" y1="12" x2="22" y2="12"></line>
+                        <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"></line>
+                        <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"></line>
+                    </svg>
+                    <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <section class="intro-note">
+        <p>
+            I'm hoping to add certain features, improve speed and user experience, and remove bugs.
+        </p>
+        <ul class="intro-list">
+            <li>
+                <strong>First look at a gene?</strong> Allow 1&ndash;5 minutes &mdash; the server collects
+                variant data from ClinVar, GnomAD, and Ensembl, calculates molecular consequences, and
+                builds the charts from scratch.
+            </li>
+            <li>
+                <strong>Seen it before?</strong> Much faster &mdash; variant and consequence data stays
+                cached on the server after the first request.
+            </li>
+            <li>
+                <strong>Found a bug, or have an idea?</strong> Reach out at
+                <a href="mailto:alexander_lehr@brown.edu">alexander_lehr@brown.edu</a>.
+            </li>
+        </ul>
+    </section>
+
+    <section class="console">
+        <div class="console-row">
+            <div class="field field-gene">
+                <label for="gene-input">Gene name</label>
+                <input id="gene-input" type="text" placeholder="e.g. NLGN3, GRIN2B, LRRTM, DLG4, etc...." autocomplete="off">
+            </div>
+            <div class="field field-transcript">
+                <label for="transcript-select">Transcript</label>
+                <select id="transcript-select" disabled>
+                    <option value="">Enter a gene first…</option>
+                </select>
+            </div>
+            <div class="field field-button">
+                <button id="generate-btn" disabled>Generate</button>
+            </div>
+        </div>
+        <div id="lookup-status" class="status-line"></div>
+    </section>
+
+    <section id="results" class="results hidden">
+
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="missense">Missense</button>
+            <button class="tab-btn" data-tab="truncations">Truncations</button>
+        </div>
+
+        <div id="generate-status" class="status-line"></div>
+
+        <!-- Missense tab -->
+        <div id="tab-missense" class="tab-panel active">
+            <div class="controls-row">
+                <div class="control">
+                    <label for="window-size">Rolling window size <span id="window-size-val">5</span></label>
+                    <input type="range" id="window-size" min="5" max="50" value="5">
+                </div>
+                <div class="control control-toggle">
+                    <label><input type="checkbox" id="normalize-missense"> Normalize missense traces</label>
+                </div>
+                <div class="control control-toggle">
+                    <label><input type="checkbox" id="flip-gnomad"> Flip GnomAD variants</label>
+                </div>
+            </div>
+            <div class="panel-label">Chart</div>
+            <div id="missense-chart" class="chart-container"></div>
+            <div class="panel-label">Data table</div>
+            <div id="missense-table" class="table-container"></div>
+        </div>
+
+        <!-- Truncations tab -->
+        <div id="tab-truncations" class="tab-panel">
+            <div class="controls-row">
+                <div class="control">
+                    <label for="intron-size">Intron display size</label>
+                    <input type="number" id="intron-size" min="10" max="1000" value="200">
+                </div>
+            </div>
+            <div class="panel-label">Chart</div>
+            <div id="trunc-chart" class="chart-container"></div>
+            <div class="panel-label">Data table</div>
+            <div id="trunc-table" class="table-container"></div>
+        </div>
+
+        <!-- Structure viewer: shared across both tabs, since its coloring options draw on
+             both missense and truncation data together (matches the original app's design) -->
+        <div class="structure-section">
+            <div class="section-header">
+                <h2>Protein structure</h2>
+                <p class="structure-note">
+                    Coloring options for variant density, binding/disorder scores, hydrophobicity, and
+                    partial charges are all available from the panel inside the viewer below.
+                </p>
+            </div>
+            <iframe id="structure-frame" title="Protein structure viewer"></iframe>
+        </div>
+
+    </section>
+
+    <footer class="site-footer">
+        Based on Kate and my paper 🥳🥳🥳: Lehr, A. W., McDaniel, K. F., &amp; Roche, K. W. (2024).
+        Analyses of Human Genetic Data to Identify Clinically Relevant Domains of Neuroligins.
+        Genes, 15(12), 1601.
+    </footer>
+
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
